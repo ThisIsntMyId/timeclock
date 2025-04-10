@@ -1,0 +1,679 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Timezone Tracker</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.4/moment.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/moment-timezone/0.5.40/moment-timezone-with-data.min.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            background-color: #f9f4ff;
+            font-family: 'Quicksand', sans-serif;
+        }
+        .world-map {
+            background-color: #dde1ff;
+            background-image: radial-gradient(circle, transparent 70%, #dde1ff 100%), 
+                              repeating-linear-gradient(45deg, #dde1ff 0px, #e9ecff 2px, #dde1ff 4px, #f5f7ff 6px, #dde1ff 8px);
+            opacity: 0.15;
+            z-index: -1;
+            border-radius: 50%;
+            transform: scale(1.5);
+        }
+        .timezone-card {
+            background-color: white;
+            border-radius: 16px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+            transition: transform 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        .timezone-card:hover {
+            transform: translateY(-5px);
+        }
+        .timezone-card::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 6px;
+            background: linear-gradient(90deg, #a78bfa, #f0abfc);
+        }
+        .timezone-card.reference-active::before {
+            background: linear-gradient(90deg, #86efac, #6ee7b7);
+        }
+        .main-card::before {
+            background: linear-gradient(90deg, #c084fc, #a78bfa);
+        }
+        .input-box {
+            background-color: white;
+            border-radius: 16px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+            position: relative;
+            overflow: hidden;
+        }
+        .input-box::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 6px;
+            background: linear-gradient(90deg, #f0abfc, #a78bfa);
+        }
+        .crayon-button {
+            background: linear-gradient(145deg, #fda4af, #f9a8d4);
+            border: none;
+            border-radius: 12px;
+            color: white;
+            transition: all 0.3s ease;
+            position: relative;
+            font-weight: 600;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .crayon-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 8px rgba(0, 0, 0, 0.12);
+        }
+        .crayon-button::after {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-image: repeating-linear-gradient(135deg, rgba(255,255,255,0.1) 0px, rgba(255,255,255,0.2) 2px, rgba(255,255,255,0.1) 4px);
+            border-radius: 12px;
+        }
+        .add-btn {
+            background: linear-gradient(145deg, #a78bfa, #c084fc);
+        }
+        .convert-btn {
+            background: linear-gradient(145deg, #f0abfc, #e879f9);
+        }
+        .reset-btn {
+            background: linear-gradient(145deg, #93c5fd, #60a5fa);
+        }
+        .delete-btn {
+            background: linear-gradient(145deg, #fca5a5, #f87171);
+            padding: 2px;
+            border-radius: 50%;
+            width: 28px;
+            height: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .input-field {
+            border: 2px solid #e5e7eb;
+            transition: all 0.3s ease;
+            border-radius: 12px;
+        }
+        .input-field:focus {
+            border-color: #c084fc;
+            box-shadow: 0 0 0 3px rgba(192, 132, 252, 0.2);
+            outline: none;
+        }
+        .badge {
+            position: absolute;
+            top: 0;
+            right: 0;
+            background: #c084fc;
+            color: white;
+            font-size: 0.75rem;
+            padding: 2px 8px;
+            border-radius: 0 0 0 8px;
+        }
+        .reference-badge {
+            position: absolute;
+            bottom: 8px;
+            right: 8px;
+            background: linear-gradient(90deg, #86efac, #6ee7b7);
+            color: #065f46;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+        }
+        .reference-badge svg {
+            margin-right: 4px;
+        }
+    </style>
+</head>
+<body class="min-h-screen py-8 px-4 sm:px-6 lg:px-8 relative">
+    <div class="world-map absolute inset-0"></div>
+    <div class="max-w-5xl mx-auto">
+        <header class="text-center mb-8">
+            <h1 class="text-4xl font-bold text-purple-600 mb-2">
+                Timezone Tracker <span class="text-2xl">⏰</span>
+            </h1>
+            <p class="text-lg text-gray-600">Track the time across multiple regions at once! ✨🌍✨</p>
+        </header>
+
+        <!-- Timezone Cards Section -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+            <!-- Main Timezone Card -->
+            <div id="main-timezone" class="timezone-card main-card p-6 relative col-span-1 md:col-span-3">
+                <!-- Will be filled by JS -->
+            </div>
+
+            <!-- Additional Timezone Cards Container -->
+            <div id="timezone-container" class="col-span-1 md:col-span-3 grid grid-cols-1 md:grid-cols-3 gap-4">
+                <!-- Will be filled by JS -->
+            </div>
+        </div>
+
+        <!-- Input Section (2 columns) -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- Reference Time Input -->
+            <div class="input-box p-6">
+                <h2 class="text-xl font-semibold text-gray-800 mb-4 flex items-center">
+                    <span class="mr-2">🕒</span> Set Reference Time
+                </h2>
+                <div class="flex flex-col sm:flex-row gap-4">
+                    <div class="relative flex-grow">
+                        <input type="text" id="reference-time" placeholder="e.g., 3:30 PM EDT" 
+                               class="input-field w-full p-3 px-4 focus:outline-none" />
+                        <div class="text-xs text-gray-500 mt-1 ml-1">
+                            Format: "time timezone" (e.g., "3:30 PM EDT" or "15:30 IST")
+                        </div>
+                    </div>
+                    <button id="convert-btn" class="crayon-button convert-btn font-medium py-3 px-6">
+                        Convert
+                    </button>
+                </div>
+                <div id="reset-container" class="mt-3 hidden">
+                    <button id="reset-time" class="crayon-button reset-btn text-white py-2 px-4 text-sm">
+                        Reset to current time
+                    </button>
+                </div>
+            </div>
+
+            <!-- Add Timezone Input -->
+            <div class="input-box p-6">
+                <h2 class="text-xl font-semibold text-gray-800 mb-4 flex items-center">
+                    <span class="mr-2">➕</span> Add Timezone
+                </h2>
+                <div class="flex flex-col sm:flex-row gap-4">
+                    <div class="relative flex-grow">
+                        <input type="text" id="timezone-input" placeholder="Enter timezone code (e.g., IST, PDT)" 
+                               class="input-field w-full p-3 px-4 focus:outline-none uppercase" />
+                        <div class="text-xs text-gray-500 mt-1 ml-1">
+                            Try common codes like EST, IST, JST or city names like Tokyo, London
+                        </div>
+                    </div>
+                    <button id="add-timezone" class="crayon-button add-btn font-medium py-3 px-6">
+                        Add
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Initialize application
+        document.addEventListener('DOMContentLoaded', function() {
+            // Get stored timezones or set defaults if none exist
+            let storedTimezones = JSON.parse(localStorage.getItem('timezones')) || [];
+            if (storedTimezones.length === 0) {
+                // Default to user's local timezone
+                const localTz = moment.tz.guess();
+                storedTimezones.push(localTz);
+                localStorage.setItem('timezones', JSON.stringify(storedTimezones));
+            }
+
+            // Initial render
+            renderMainTimezone();
+            renderTimezoneCards();
+            
+            // Set up event listeners
+            document.getElementById('add-timezone').addEventListener('click', addTimezone);
+            document.getElementById('convert-btn').addEventListener('click', convertReferenceTime);
+            
+            // Automatically convert timezone input to uppercase
+            document.getElementById('timezone-input').addEventListener('input', function(e) {
+                this.value = this.value.toUpperCase();
+            });
+            
+            // Enter key handlers
+            document.getElementById('timezone-input').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    addTimezone();
+                }
+            });
+            
+            document.getElementById('reference-time').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    convertReferenceTime();
+                }
+            });
+            
+            // Also force reference time to uppercase
+            document.getElementById('reference-time').addEventListener('input', function(e) {
+                this.value = this.value.toUpperCase();
+            });
+
+            // Refresh times every minute
+            setInterval(function() {
+                if (!document.getElementById('main-timezone').classList.contains('reference-active')) {
+                    renderMainTimezone();
+                    renderTimezoneCards();
+                }
+            }, 60000);
+
+            document.getElementById('reference-time').focus();
+        });
+
+        // Render the main timezone card (user's local timezone)
+        function renderMainTimezone(isReferenceMode = false) {
+            const mainTimezoneEl = document.getElementById('main-timezone');
+            const localTz = moment.tz.guess();
+            const now = moment();
+            
+            // Format: "10:30 PM EDT" and "Tuesday, Apr 08 2025"
+            const timeStr = now.tz(localTz).format('h:mm A');
+            const dateStr = now.tz(localTz).format('dddd, MMM DD YYYY');
+            const tzCode = now.tz(localTz).format('z');
+            
+            // Just use the full timezone name
+            const displayName = localTz;
+            
+            // Clear any previous reference-active class
+            mainTimezoneEl.classList.remove('reference-active');
+            
+            if (isReferenceMode) {
+                mainTimezoneEl.classList.add('reference-active');
+            }
+            
+            mainTimezoneEl.innerHTML = `
+                <div class="badge">LOCAL</div>
+                <div class="flex items-center">
+                    <div>
+                        <div class="text-4xl font-bold text-gray-800">${timeStr} <span class="text-purple-600">${tzCode}</span></div>
+                        <div class="text-gray-500">${dateStr}</div>
+                        <div class="text-gray-400 text-sm mt-1">${displayName}</div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Render all timezone cards from localStorage
+        function renderTimezoneCards(referenceTime = null, referenceString = '') {
+            const timezoneContainer = document.getElementById('timezone-container');
+            timezoneContainer.innerHTML = '';
+            
+            const storedTimezones = JSON.parse(localStorage.getItem('timezones')) || [];
+            const localTz = moment.tz.guess();
+            
+            // Filter out the local timezone as it's already displayed in the main card
+            const filteredTimezones = storedTimezones.filter(tz => tz !== localTz);
+            
+            if (filteredTimezones.length === 0) {
+                timezoneContainer.innerHTML = `
+                    <div class="col-span-full text-center py-10 bg-white rounded-lg border-2 border-dashed border-gray-200">
+                        <p class="text-gray-500">No additional timezones added yet.</p>
+                        <p class="text-gray-500 text-sm mt-1">Add some using the input above! ⬆️</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            // Update the main card if we're in reference mode
+            if (referenceTime) {
+                document.getElementById('main-timezone').classList.add('reference-active');
+                const referenceIndicator = document.createElement('div');
+                referenceIndicator.className = 'reference-badge';
+                referenceIndicator.innerHTML = `
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    Reference: ${referenceString}
+                `;
+                document.getElementById('main-timezone').appendChild(referenceIndicator);
+                document.getElementById('reset-container').classList.remove('hidden');
+                
+                // Update the main timezone card with reference time
+                updateMainTimezoneWithReference(referenceTime);
+            } else {
+                document.getElementById('main-timezone').classList.remove('reference-active');
+                const existingBadge = document.getElementById('main-timezone').querySelector('.reference-badge');
+                if (existingBadge) {
+                    existingBadge.remove();
+                }
+                document.getElementById('reset-container').classList.add('hidden');
+            }
+            
+            filteredTimezones.forEach((timezone, index) => {
+                try {
+                    let timeObj;
+                    
+                    if (referenceTime) {
+                        // Convert the reference time to this timezone
+                        timeObj = referenceTime.clone().tz(timezone);
+                    } else {
+                        timeObj = moment().tz(timezone);
+                    }
+                    
+                    const timeStr = timeObj.format('h:mm A');
+                    const dateStr = timeObj.format('dddd, MMM DD YYYY');
+                    const tzCode = timeObj.format('z');
+                    
+                    // Display the full timezone name without the city
+                    let displayName = timezone;
+                    
+                    // Extract region and city for better display
+                    if (timezone.includes('/')) {
+                        const parts = timezone.split('/');
+                        const region = parts[0];
+                        const city = parts[parts.length - 1].replace(/_/g, ' ');
+                        displayName = `${region}/${city}`;
+                    }
+                    
+                    const card = document.createElement('div');
+                    card.className = referenceTime ? 'timezone-card reference-active p-5 relative' : 'timezone-card p-5 relative';
+                    
+                    card.innerHTML = `
+                        <button class="delete-btn absolute top-3 right-3 crayon-button" data-index="${index}">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                        <div>
+                            <div class="text-2xl font-bold text-gray-800">${timeStr} <span class="text-purple-600">${tzCode}</span></div>
+                            <div class="text-sm text-gray-500">${dateStr}</div>
+                            <div class="text-gray-400 text-xs mt-1">${displayName}</div>
+                        </div>
+                    `;
+                    
+                    timezoneContainer.appendChild(card);
+                    
+                    // Add delete button event listener
+                    const deleteBtn = card.querySelector('.delete-btn');
+                    deleteBtn.addEventListener('click', function(e) {
+                        e.stopPropagation();
+                        removeTimezone(parseInt(this.dataset.index));
+                    });
+                } catch (error) {
+                    console.error(`Error with timezone: ${timezone}`, error);
+                }
+            });
+        }
+        
+        // Update the main timezone card with reference time
+        function updateMainTimezoneWithReference(referenceTime) {
+            const mainTimezoneEl = document.getElementById('main-timezone');
+            const localTz = moment.tz.guess();
+            
+            // Convert reference time to local timezone
+            const localTime = referenceTime.clone().tz(localTz);
+            
+            // Format the time
+            const timeStr = localTime.format('h:mm A');
+            const dateStr = localTime.format('dddd, MMM DD YYYY');
+            const tzCode = localTime.format('z');
+            
+            // Get a nicer display name for the timezone
+            let displayName = localTz;
+            if (localTz.includes('/')) {
+                const parts = localTz.split('/');
+                const region = parts[0];
+                const city = parts[parts.length - 1].replace(/_/g, ' ');
+                displayName = `${region}/${city}`;
+            }
+            
+            mainTimezoneEl.innerHTML = `
+                <div class="badge">LOCAL</div>
+                <div class="flex items-center">
+                    <div>
+                        <div class="text-4xl font-bold text-gray-800">${timeStr} <span class="text-purple-600">${tzCode}</span></div>
+                        <div class="text-gray-500">${dateStr}</div>
+                        <div class="text-gray-400 text-sm mt-1">${displayName}</div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Add a new timezone
+        function addTimezone() {
+            const timezoneInput = document.getElementById('timezone-input');
+            const timezoneCode = timezoneInput.value.trim().toUpperCase();
+            
+            if (!timezoneCode) {
+                showError("Please enter a timezone code");
+                return;
+            }
+            
+            // Try to validate the timezone
+            let validTimezone = null;
+            
+            // First, try exact match
+            if (moment.tz.zone(timezoneCode)) {
+                validTimezone = timezoneCode;
+            } else {
+                // Try to find a matching timezone
+                const tzNames = moment.tz.names();
+                
+                // Look for timezone codes that contain the input (case insensitive)
+                const matchingTz = tzNames.find(tz => {
+                    const abbr = moment.tz(tz).format('z');
+                    return abbr.toUpperCase() === timezoneCode;
+                });
+                
+                if (matchingTz) {
+                    validTimezone = matchingTz;
+                } else {
+                    // Try to match with region/city format
+                    const matchingRegion = tzNames.find(tz => 
+                        tz.toUpperCase().includes(timezoneCode)
+                    );
+                    
+                    if (matchingRegion) {
+                        validTimezone = matchingRegion;
+                    }
+                }
+            }
+            
+            if (!validTimezone) {
+                showError("Invalid timezone code. Try a standard code like EST, IST, JST or a city name.");
+                return;
+            }
+            
+            // Get stored timezones
+            const storedTimezones = JSON.parse(localStorage.getItem('timezones')) || [];
+            
+            // Check if timezone already exists
+            if (storedTimezones.includes(validTimezone)) {
+                showError("This timezone is already added");
+                timezoneInput.value = '';
+                return;
+            }
+            
+            // Add new timezone
+            storedTimezones.push(validTimezone);
+            localStorage.setItem('timezones', JSON.stringify(storedTimezones));
+            
+            // Clear input and re-render cards
+            timezoneInput.value = '';
+            renderTimezoneCards();
+            
+            // Show success message
+            const successAlert = document.createElement('div');
+            successAlert.className = 'fixed top-4 right-4 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded transition-opacity';
+            successAlert.style.zIndex = '50';
+            successAlert.innerHTML = `Timezone ${validTimezone} added successfully! ✅`;
+            document.body.appendChild(successAlert);
+            
+            setTimeout(() => {
+                successAlert.style.opacity = '0';
+                setTimeout(() => {
+                    document.body.removeChild(successAlert);
+                }, 300);
+            }, 2000);
+        }
+
+        // Remove a timezone
+        function removeTimezone(index) {
+            const storedTimezones = JSON.parse(localStorage.getItem('timezones')) || [];
+            const localTz = moment.tz.guess();
+            
+            // Filter out the local timezone for the displayed list
+            const filteredTimezones = storedTimezones.filter(tz => tz !== localTz);
+            
+            // Make sure the index is valid
+            if (index >= 0 && index < filteredTimezones.length) {
+                const removedTz = filteredTimezones[index];
+                
+                // Find the actual index in the full timezone array
+                const actualIndex = storedTimezones.findIndex(tz => tz === removedTz);
+                if (actualIndex !== -1) {
+                    storedTimezones.splice(actualIndex, 1);
+                    localStorage.setItem('timezones', JSON.stringify(storedTimezones));
+                    renderTimezoneCards();
+                }
+            }
+        }
+
+        // Convert reference time to all timezones
+        function convertReferenceTime() {
+            const referenceInput = document.getElementById('reference-time');
+            let inputValue = referenceInput.value.trim().toUpperCase();
+            
+            if (!inputValue) {
+                showError("Please enter a reference time");
+                return;
+            }
+            
+            // Try to parse the input
+            let momentObj;
+            let sourceTz = "";
+            
+            try {
+                // Basic approach - split the string into components
+                let timePart = "";
+                let timezonePart = "";
+                
+                // Check if we have AM/PM format
+                if (inputValue.includes("AM") || inputValue.includes("PM")) {
+                    // Format like "3:30 PM EDT"
+                    const pmIndex = inputValue.indexOf("PM");
+                    const amIndex = inputValue.indexOf("AM");
+                    const timeIndex = pmIndex !== -1 ? pmIndex : amIndex;
+                    
+                    if (timeIndex !== -1) {
+                        // Include the AM/PM in the time part
+                        timePart = inputValue.substring(0, timeIndex + 2).trim();
+                        // Get timezone after AM/PM
+                        timezonePart = inputValue.substring(timeIndex + 2).trim();
+                    }
+                } else if (inputValue.includes(":")) {
+                    // Format like "15:30 EDT"
+                    const parts = inputValue.split(" ");
+                    if (parts.length >= 1) {
+                        timePart = parts[0]; // Just the time
+                        if (parts.length > 1) {
+                            timezonePart = parts.slice(1).join(" ");
+                        }
+                    }
+                }
+                
+                console.log("Parsed parts:", { timePart, timezonePart });
+                
+                // Now process based on what we have
+                if (timezonePart) {
+                    // Try to find the timezone
+                    let targetTz = "";
+                    
+                    // Direct mapping for common abbreviations
+                    const tzMap = {
+                        "EDT": "America/New_York",
+                        "EST": "America/New_York",
+                        "CDT": "America/Chicago",
+                        "CST": "America/Chicago",
+                        "MDT": "America/Denver",
+                        "MST": "America/Denver",
+                        "PDT": "America/Los_Angeles",
+                        "PST": "America/Los_Angeles",
+                        "IST": "Asia/Kolkata",
+                        "JST": "Asia/Tokyo",
+                        "IDT": "Asia/Jerusalem"
+                    };
+                    
+                    // Try direct lookup
+                    if (tzMap[timezonePart]) {
+                        targetTz = tzMap[timezonePart];
+                    } 
+                    // Or it might be a full timezone name already
+                    else if (moment.tz.zone(timezonePart)) {
+                        targetTz = timezonePart;
+                    }
+                    
+                    if (targetTz) {
+                        console.log("Using timezone:", targetTz);
+                        sourceTz = targetTz;
+                        
+                        // Use the timezone with just the time part
+                        if (timePart.includes("AM") || timePart.includes("PM")) {
+                            momentObj = moment.tz(timePart, "h:mm A", targetTz);
+                        } else {
+                            momentObj = moment.tz(timePart, "HH:mm", targetTz);
+                        }
+                    } else {
+                        throw new Error("Unknown timezone: " + timezonePart);
+                    }
+                } else {
+                    // No timezone, use local
+                    sourceTz = moment.tz.guess();
+                    if (timePart.includes("AM") || timePart.includes("PM")) {
+                        momentObj = moment.tz(timePart, "h:mm A", sourceTz);
+                    } else {
+                        momentObj = moment.tz(timePart, "HH:mm", sourceTz);
+                    }
+                }
+                
+                if (!momentObj || !momentObj.isValid()) {
+                    throw new Error("Invalid time format");
+                }
+                
+                console.log("Parsed time successfully:", momentObj.format(), "in timezone:", sourceTz);
+            } catch (error) {
+                console.error("Time parsing error:", error, "for input:", inputValue);
+                showError("Invalid time format. Try something like '3:30 PM EDT' or '15:30 IST'");
+                return;
+            }
+            
+            // Update the cards with the reference time
+            renderMainTimezone(true, momentObj); // Mark the main timezone as in reference mode
+            renderTimezoneCards(momentObj, inputValue);
+            
+            // Setup reset functionality
+            document.getElementById('reset-time').addEventListener('click', function() {
+                referenceInput.value = '';
+                renderMainTimezone(false);
+                renderTimezoneCards();
+            });
+        }
+
+        // Show error message
+        function showError(message) {
+            const errorAlert = document.createElement('div');
+            errorAlert.className = 'fixed top-4 right-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded transition-opacity';
+            errorAlert.style.zIndex = '50';
+            errorAlert.innerHTML = message;
+            document.body.appendChild(errorAlert);
+            
+            setTimeout(() => {
+                errorAlert.style.opacity = '0';
+                setTimeout(() => {
+                    document.body.removeChild(errorAlert);
+                }, 300);
+            }, 3000);
+        }
+    </script>
+</body>
+</html>
